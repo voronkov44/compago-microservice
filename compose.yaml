@@ -1,0 +1,54 @@
+services:
+  tasks:
+    image: tasks:latest
+    build:
+      context: services
+      dockerfile: dockerfiles/Dockerfile.tasks
+    container_name: tasks
+    restart: unless-stopped
+    ports:
+      - "28081:8080"
+    environment:
+      TASKS_ADDRESS: :8080
+      DB_ADDRESS: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-postgres}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin4
+    restart: unless-stopped
+    ports:
+      - "18888:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_DISABLE_POSTFIX: "true"
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    depends_on:
+      - postgres
+
+volumes:
+  postgres:
+  pgadmin:

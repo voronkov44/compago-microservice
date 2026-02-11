@@ -1,0 +1,26 @@
+package core
+
+import "context"
+
+type CategoriesDB interface {
+	CreateCategory(ctx context.Context, name string) (Category, error)
+	GetCategory(ctx context.Context, id int64) (Category, error)
+	ListCategories(ctx context.Context) ([]Category, error)
+	UpdateCategory(ctx context.Context, id int64, name string) (Category, error)
+	DeleteCategory(ctx context.Context, id int64) error
+}
+
+type TasksDB interface {
+	CreateTask(ctx context.Context, categoryID *int64, name, description string) (Task, error)
+	GetTask(ctx context.Context, id int64) (Task, error)
+	ListTasks(ctx context.Context, f ListTasksFilter) ([]Task, error)
+	UpdateTask(ctx context.Context, t Task) (Task, error)
+	DeleteTask(ctx context.Context, id int64) error
+}
+
+type DB interface {
+	CategoriesDB
+	TasksDB
+
+	Ping(ctx context.Context) error
+}

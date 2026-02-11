@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package tasks.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "task-manager-microservice/services/proto/tasks;taskspb";
+
+service CategoriesService {
+  rpc CreateCategory(CreateCategoryRequest) returns (Category);
+  rpc GetCategory(GetCategoryRequest) returns (Category);
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse);
+  rpc UpdateCategory(UpdateCategoryRequest) returns (Category);
+  rpc DeleteCategory(DeleteCategoryRequest) returns (google.protobuf.Empty);
+
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+}
+
+message Category {
+  int64 id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message CreateCategoryRequest {
+  string name = 1;
+}
+
+message GetCategoryRequest {
+  int64 id = 1;
+}
+
+message ListCategoriesRequest {}
+
+message ListCategoriesResponse {
+  repeated Category categories = 1;
+}
+
+message UpdateCategoryRequest {
+  int64 id = 1;
+  string name = 2;
+}
+
+message DeleteCategoryRequest {
+  int64 id = 1;
+}

@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package tasks.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/field_mask.proto";
+
+option go_package = "task-manager-microservice/services/proto/tasks;taskspb";
+
+service TasksService {
+  rpc CreateTask(CreateTaskRequest) returns (Task);
+  rpc GetTask(GetTaskRequest) returns (Task);
+  rpc ListTask(ListTaskRequest) returns (ListTaskResponse);
+  rpc UpdateTask(UpdateTaskRequest) returns (Task);
+  rpc DeleteTask(DeleteTaskRequest) returns (google.protobuf.Empty);
+
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+}
+
+enum TaskStatus {
+  TASK_STATUS_TODO = 0;
+  TASK_STATUS_IN_PROGRESS = 1;
+  TASK_STATUS_DONE = 2;
+  TASK_STATUS_ARCHIVED = 3;
+}
+
+message Task {
+  int64 id = 1;
+
+  // 0 => без категории
+  int64 category_id = 2;
+
+  string name = 3;
+  string description = 4;
+
+  TaskStatus status = 5;
+
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message CreateTaskRequest {
+  // 0 => без категории
+  int64 category_id = 1;
+
+  string name = 2;
+  string description = 3;
+}
+
+message GetTaskRequest {
+  int64 id = 1;
+}
+
+message ListTaskRequest {
+  // Если oneof не выбран не фильтруем по статусу
+  oneof status_filter {
+    TaskStatus status = 1;
+  }
+
+  oneof category_filter {
+    int64 category_id = 2;      // задачи в конкретной категории
+    bool without_category = 3;   // только задачи без категории
+  }
+
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+message ListTaskResponse {
+  repeated Task tasks = 1;
+}
+
+message UpdateTaskRequest {
+  int64 id = 1;
+
+  // 0 => снять категорию
+  optional int64 category_id = 2;
+
+  optional string name = 3;
+  optional string description = 4;
+
+  optional TaskStatus status = 5;
+  google.protobuf.FieldMask update_mask = 6;
+}
+
+message DeleteTaskRequest {
+  int64 id = 1;
+}
