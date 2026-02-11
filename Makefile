@@ -4,6 +4,8 @@ $(info using ${container_runtime})
 ENV_FILE ?= .env
 COMPOSE := ${container_runtime} compose --env-file $(ENV_FILE)
 
+.PHONY: test test-tasks
+
 # all services
 up: down
 	$(COMPOSE) up --build -d
@@ -14,16 +16,13 @@ down:
 clean:
 	$(COMPOSE) down -v
 
-run-tests:
-	${container_runtime} run --rm --network=host tests:latest
 
 test:
-	make down
-	make up
-	@echo wait cluster to start && sleep 10
-	make run-tests
-	make down
-	@echo "test finished"
+	@$(MAKE) -C services test
+
+test-tasks:
+	@$(MAKE) -C services test SERVICE=tasks
+
 
 lint:
 	make -C services lint
