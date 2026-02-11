@@ -3,7 +3,9 @@ package grpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -184,30 +186,13 @@ func (s *Server) UpdateTask(ctx context.Context, req *taskspb.UpdateTaskRequest)
 	if req == nil || req.GetId() <= 0 {
 		return nil, status.Error(codes.InvalidArgument, "invalid id")
 	}
-	if req.GetCategoryId() < 0 {
-		return nil, status.Error(codes.InvalidArgument, "category_id cannot be negative")
-	}
 
-	st, err := pbStatusToCore(req.GetStatus())
+	patch, err := taskPatchFromPB(req)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid status")
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	var catID *int64
-	if req.GetCategoryId() != 0 {
-		id := req.GetCategoryId()
-		catID = &id
-	}
-
-	t := core.Task{
-		ID:          req.GetId(),
-		CategoryID:  catID, // nil => снять категорию
-		Name:        req.GetName(),
-		Description: req.GetDescription(),
-		Status:      st,
-	}
-
-	updated, err := s.service.UpdateTask(ctx, t)
+	updated, err := s.service.PatchTask(ctx, req.GetId(), patch)
 	if err != nil {
 		return nil, s.mapErr(err)
 	}
@@ -267,6 +252,87 @@ func pbStatusToCore(st taskspb.TaskStatus) (core.TaskStatus, error) {
 	default:
 		return core.TODO, errors.New("unknown status")
 	}
+}
+
+func taskPatchFromPB(req *taskspb.UpdateTaskRequest) (core.TaskPatch, error) {
+	var p core.TaskPatch
+
+	useMask := req.GetUpdateMask() != nil && len(req.GetUpdateMask().GetPaths()) > 0
+	if useMask {
+		for _, path := range req.GetUpdateMask().GetPaths() {
+			switch path {
+			case "category_id":
+				if req.CategoryId == nil {
+					return p, fmt.Errorf("update_mask includes category_id but category_id is not set")
+				}
+				v := req.GetCategoryId()
+				p.CategoryID = &v
+
+			case "name":
+				if req.Name == nil {
+					return p, fmt.Errorf("update_mask includes name but name is not set")
+				}
+				v := req.GetName()
+				p.Name = &v
+
+			case "description":
+				if req.Description == nil {
+					return p, fmt.Errorf("update_mask includes description but description is not set")
+				}
+				v := req.GetDescription()
+				p.Description = &v
+
+			case "status":
+				if req.Status == nil {
+					return p, fmt.Errorf("update_mask includes status but status is not set")
+				}
+				st, err := pbStatusToCore(req.GetStatus())
+				if err != nil {
+					return p, fmt.Errorf("invalid status")
+				}
+				p.Status = &st
+
+			default:
+				return p, fmt.Errorf("unknown field in update_mask: %s", path)
+			}
+		}
+	} else {
+		// infer patch by presence of optional fields
+		if req.CategoryId != nil {
+			v := req.GetCategoryId()
+			p.CategoryID = &v
+		}
+		if req.Name != nil {
+			v := req.GetName()
+			p.Name = &v
+		}
+		if req.Description != nil {
+			v := req.GetDescription()
+			p.Description = &v
+		}
+		if req.Status != nil {
+			st, err := pbStatusToCore(req.GetStatus())
+			if err != nil {
+				return p, fmt.Errorf("invalid status")
+			}
+			p.Status = &st
+		}
+	}
+
+	// запретим пустой patch
+	if p.CategoryID == nil && p.Name == nil && p.Description == nil && p.Status == nil {
+		return p, fmt.Errorf("no fields to update")
+	}
+
+	// минимальная ранняя валидация (детальнее — в сервисе)
+	if p.Name != nil && strings.TrimSpace(*p.Name) == "" {
+		return p, fmt.Errorf("name cannot be empty")
+	}
+	if p.CategoryID != nil && *p.CategoryID < 0 {
+		return p, fmt.Errorf("category_id cannot be negative")
+	}
+
+	return p, nil
 }
 
 func coreStatusToPB(st core.TaskStatus) taskspb.TaskStatus {

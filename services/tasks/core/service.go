@@ -59,13 +59,27 @@ func (s *Service) DeleteCategory(ctx context.Context, id int64) error {
 
 // Tasks
 
+type TaskPatch struct {
+	CategoryID  *int64
+	Name        *string
+	Description *string
+	Status      *TaskStatus
+}
+
 func (s *Service) CreateTask(ctx context.Context, categoryID *int64, name, description string) (Task, error) {
 	if strings.TrimSpace(name) == "" {
 		return Task{}, ErrTaskInvalidArgs
 	}
-	if categoryID != nil && *categoryID <= 0 {
-		categoryID = nil // 0 => без категории
+
+	if categoryID != nil {
+		if *categoryID <= 0 {
+			return Task{}, ErrTaskInvalidArgs
+		}
+		if _, err := s.db.GetCategory(ctx, *categoryID); err != nil {
+			return Task{}, err
+		}
 	}
+
 	return s.db.CreateTask(ctx, categoryID, name, description)
 }
 
@@ -99,10 +113,71 @@ func (s *Service) UpdateTask(ctx context.Context, t Task) (Task, error) {
 	if !isValidStatus(t.Status) {
 		return Task{}, ErrTaskInvalidArgs
 	}
-	if t.CategoryID != nil && *t.CategoryID <= 0 {
-		t.CategoryID = nil // 0 => снять категорию
+
+	if t.CategoryID != nil {
+		if *t.CategoryID <= 0 {
+			return Task{}, ErrTaskInvalidArgs
+		}
+		if _, err := s.db.GetCategory(ctx, *t.CategoryID); err != nil {
+			return Task{}, err
+		}
 	}
+
 	return s.db.UpdateTask(ctx, t)
+}
+
+func (s *Service) PatchTask(ctx context.Context, id int64, p TaskPatch) (Task, error) {
+	if id <= 0 {
+		return Task{}, ErrTaskInvalidArgs
+	}
+	if p.CategoryID == nil && p.Name == nil && p.Description == nil && p.Status == nil {
+		return Task{}, ErrTaskInvalidArgs
+	}
+
+	cur, err := s.db.GetTask(ctx, id)
+	if err != nil {
+		return Task{}, err // ErrTaskNotFound -> NotFound
+	}
+
+	if p.Name != nil {
+		name := strings.TrimSpace(*p.Name)
+		if name == "" {
+			return Task{}, ErrTaskInvalidArgs
+		}
+		cur.Name = name
+	}
+
+	if p.Description != nil {
+		// пустая строка => очистить description (в БД станет NULL через NULLIF)
+		cur.Description = strings.TrimSpace(*p.Description)
+	}
+
+	if p.Status != nil {
+		if !isValidStatus(*p.Status) {
+			return Task{}, ErrTaskInvalidArgs
+		}
+		cur.Status = *p.Status
+	}
+
+	if p.CategoryID != nil {
+		if *p.CategoryID < 0 {
+			return Task{}, ErrTaskInvalidArgs
+		}
+
+		if *p.CategoryID == 0 {
+			// remove category
+			cur.CategoryID = nil
+		} else {
+			cid := *p.CategoryID
+			// requirement: if category_id set -> check existence -> NotFound
+			if _, err := s.db.GetCategory(ctx, cid); err != nil {
+				return Task{}, err
+			}
+			cur.CategoryID = &cid
+		}
+	}
+
+	return s.db.UpdateTask(ctx, cur)
 }
 
 func (s *Service) DeleteTask(ctx context.Context, id int64) error {

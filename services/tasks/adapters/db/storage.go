@@ -145,7 +145,10 @@ func (db *DB) CreateTask(ctx context.Context, categoryID *int64, name, descripti
 		Scan(&t.ID, &t.CategoryID, &t.Name, &t.Description, &t.Status, &t.CreatedAt, &t.UpdatedAt)
 
 	if err != nil {
-		if isForeignKeyViolation(err) || isCheckViolation(err) {
+		if isForeignKeyViolation(err) {
+			return core.Task{}, core.ErrCategoryNotFound
+		}
+		if isCheckViolation(err) {
 			return core.Task{}, core.ErrTaskInvalidArgs
 		}
 		return core.Task{}, fmt.Errorf("insert task: %w", err)
@@ -232,7 +235,10 @@ func (db *DB) UpdateTask(ctx context.Context, t core.Task) (core.Task, error) {
 
 	var out core.Task
 	if err := db.conn.GetContext(ctx, &out, q, t.ID, t.CategoryID, t.Name, strings.TrimSpace(t.Description), int16(t.Status)); err != nil {
-		if isForeignKeyViolation(err) || isCheckViolation(err) {
+		if isForeignKeyViolation(err) {
+			return core.Task{}, core.ErrCategoryNotFound
+		}
+		if isCheckViolation(err) {
 			return core.Task{}, core.ErrTaskInvalidArgs
 		}
 		if errors.Is(err, sql.ErrNoRows) {
