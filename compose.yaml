@@ -1,4 +1,26 @@
 services:
+  api:
+    image: api:latest
+    build:
+      context: services
+      dockerfile: dockerfiles/Dockerfile.api
+    container_name: api
+    restart: unless-stopped
+    ports:
+      - "28080:8080"
+    volumes:
+      - ./services/api/config.yaml:/config.yaml
+    environment:
+      ADMIN_USER: ${API_ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${API_ADMIN_PASSWORD:-password}
+
+      API_ADDRESS: :8080
+      TASKS_ADDRESS: tasks:8080
+
+    depends_on:
+      - tasks
+
+
   tasks:
     image: tasks:latest
     build:

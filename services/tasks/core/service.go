@@ -148,7 +148,6 @@ func (s *Service) PatchTask(ctx context.Context, id int64, p TaskPatch) (Task, e
 	}
 
 	if p.Description != nil {
-		// пустая строка => очистить description (в БД станет NULL через NULLIF)
 		cur.Description = strings.TrimSpace(*p.Description)
 	}
 

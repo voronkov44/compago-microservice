@@ -1,0 +1,7 @@
+log_level: DEBUG
+
+tasks_address: "tasks:8080"
+
+api_server:
+  address: ":8080"
+  timeout: 5s
